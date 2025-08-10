@@ -24,3 +24,11 @@ build/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Binary files
+*.exe
+*.deb
+*.bin
+
+# Chrome user data
+chrome_user_data/
