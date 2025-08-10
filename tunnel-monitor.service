@@ -1,0 +1,12 @@
+[Unit]
+Description=Cloudflare Tunnel Auto-Restart + WhatsApp Link
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/cloudflare_tunnel_monitor/tunnel_monitor.py
+Restart=always
+User=root
+WorkingDirectory=/opt/cloudflare_tunnel_monitor
+
+[Install]
+WantedBy=multi-user.target

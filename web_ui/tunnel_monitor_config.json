@@ -1,0 +1,13 @@
+{
+    "whatsapp_contact": "+8801629866954",
+    "tunnel_url": "http://192.168.100.1:8096/",
+    "chrome_path": null,
+    "cloudflared_path": null,
+    "user_data_dir": "D:\\Project\\Git Hub\\cloudflare_tunnel_monitor\\web_ui\\chrome_user_data",
+    "check_interval": 5,
+    "max_retries": 3,
+    "retry_delay": 5,
+    "message_template": "\ud83c\udf10 New Tunnel Link ({timestamp}):\n{link}",
+    "debug_mode": false,
+    "headless_mode": false
+}

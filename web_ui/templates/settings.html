@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Cloudflare Tunnel Monitor{% endblock %}
+
+{% block content %}
+<div class="settings">
+    <h1><i class="fas fa-cog"></i> Settings</h1>
+    
+    <form id="settings-form" class="settings-form">
+        <!-- WhatsApp Settings Section -->
+        <section class="settings-section">
+            <h2><i class="fab fa-whatsapp"></i> WhatsApp Settings</h2>
+            
+            <div class="form-group">
+                <label for="whatsapp_contact">WhatsApp Contact:</label>
+                <input type="text" id="whatsapp_contact" name="whatsapp_contact" value="{{ config.whatsapp_contact }}" required>
+                <div class="help-text">Phone number with country code (e.g., +1234567890) or contact name</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="message_template">Message Template:</label>
+                <textarea id="message_template" name="message_template" rows="3" required>{{ config.message_template }}</textarea>
+                <div class="help-text">Use {timestamp} for current time and {link} for tunnel URL</div>
+            </div>
+        </section>
+        
+        <!-- Tunnel Settings Section -->
+        <section class="settings-section">
+            <h2><i class="fas fa-server"></i> Tunnel Settings</h2>
+            
+            <div class="form-group">
+                <label for="tunnel_url">Tunnel URL:</label>
+                <input type="text" id="tunnel_url" name="tunnel_url" value="{{ config.tunnel_url }}" required>
+                <div class="help-text">Local service URL to expose (e.g., http://localhost:8080)</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="cloudflared_path">Cloudflared Path:</label>
+                <div class="input-with-button">
+                    <input type="text" id="cloudflared_path" name="cloudflared_path" value="{{ config.cloudflared_path or '' }}">
+                    <button type="button" class="btn btn-secondary browse-btn" data-target="cloudflared_path">
+                        <i class="fas fa-folder-open"></i> Browse
+                    </button>
+                </div>
+                <div class="help-text">Path to cloudflared executable (leave empty for auto-detection)</div>
+            </div>
+        </section>
+        
+        <!-- Browser Settings Section -->
+        <section class="settings-section">
+            <h2><i class="fas fa-globe"></i> Browser Settings</h2>
+            
+            <div class="form-group">
+                <label for="chrome_path">Chrome Path:</label>
+                <div class="input-with-button">
+                    <input type="text" id="chrome_path" name="chrome_path" value="{{ config.chrome_path or '' }}">
+                    <button type="button" class="btn btn-secondary browse-btn" data-target="chrome_path">
+                        <i class="fas fa-folder-open"></i> Browse
+                    </button>
+                </div>
+                <div class="help-text">Path to Chrome browser executable (leave empty for auto-detection)</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="user_data_dir">User Data Directory:</label>
+                <div class="input-with-button">
+                    <input type="text" id="user_data_dir" name="user_data_dir" value="{{ config.user_data_dir }}">
+                    <button type="button" class="btn btn-secondary browse-btn" data-target="user_data_dir">
+                        <i class="fas fa-folder-open"></i> Browse
+                    </button>
+                </div>
+                <div class="help-text">Directory to store Chrome user data (WhatsApp session)</div>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="headless_mode" name="headless_mode" {% if config.headless_mode %}checked{% endif %}>
+                <label for="headless_mode">Headless Mode</label>
+                <div class="help-text">Run Chrome in headless mode (no visible browser window)</div>
+            </div>
+        </section>
+        
+        <!-- Connection Settings Section -->
+        <section class="settings-section">
+            <h2><i class="fas fa-network-wired"></i> Connection Settings</h2>
+            
+            <div class="form-group">
+                <label for="check_interval">Check Interval (seconds):</label>
+                <input type="number" id="check_interval" name="check_interval" value="{{ config.check_interval }}" min="1" max="3600" required>
+                <div class="help-text">How often to check internet connection</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="max_retries">Maximum Retries:</label>
+                <input type="number" id="max_retries" name="max_retries" value="{{ config.max_retries }}" min="1" max="100" required>
+                <div class="help-text">Maximum number of retries when internet connection is lost</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="retry_delay">Retry Delay (seconds):</label>
+                <input type="number" id="retry_delay" name="retry_delay" value="{{ config.retry_delay }}" min="1" max="3600" required>
+                <div class="help-text">Delay between retries (will be multiplied by retry count)</div>
+            </div>
+        </section>
+        
+        <!-- Advanced Settings Section -->
+        <section class="settings-section">
+            <h2><i class="fas fa-tools"></i> Advanced Settings</h2>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="debug_mode" name="debug_mode" {% if config.debug_mode %}checked{% endif %}>
+                <label for="debug_mode">Debug Mode</label>
+                <div class="help-text">Enable detailed logging for troubleshooting</div>
+            </div>
+        </section>
+        
+        <!-- Submit Button -->
+        <div class="form-actions">
+            <button type="button" id="save-settings-button" class="btn btn-primary"><i class="fas fa-save"></i> Save Settings</button>
+            <button type="button" id="reset-settings-button" class="btn btn-secondary"><i class="fas fa-undo"></i> Reset to Defaults</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}
