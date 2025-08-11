@@ -456,7 +456,7 @@ def ping_test():
     if result is not None:
         ping_data["ping_history"].append({
             "timestamp": timestamp,
-            "value": result
+            "ping_time": result
         })
         
         # Keep only the last minute of ping results
@@ -464,7 +464,7 @@ def ping_test():
             ping_data["ping_history"].pop(0)
         
         # Calculate statistics
-        ping_values = [p["value"] for p in ping_data["ping_history"]]
+        ping_values = [p["ping_time"] for p in ping_data["ping_history"]]
         avg_ping = sum(ping_values) / len(ping_values) if ping_values else 0
         min_ping = min(ping_values) if ping_values else 0
         max_ping = max(ping_values) if ping_values else 0
@@ -621,7 +621,7 @@ def calculate_ping_stats(ping_history):
             "count": 0
         }
     
-    ping_times = [entry["value"] for entry in ping_history if "value" in entry]
+    ping_times = [entry["ping_time"] for entry in ping_history if "ping_time" in entry]
     
     if not ping_times:
         return {

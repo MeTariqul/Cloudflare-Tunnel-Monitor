@@ -10,7 +10,7 @@ A robust, production-ready solution for automatically creating and monitoring Cl
 
 - **Automated Tunnel Management**: Creates and maintains Cloudflare Tunnels with zero manual intervention
 - **Intelligent Connection Monitoring**: Continuously checks internet connectivity and automatically restarts tunnels when needed
-- **Real-time Ping Analytics**: Monitors and visualizes network latency to configurable endpoints
+- **Real-time Ping Analytics**: Monitors and visualizes network latency to configurable endpoints with detailed statistics (average, minimum, maximum, and count)
 - **Dual Interface Options**:
   - Modern, responsive web UI accessible from any device
   - Native desktop GUI for local management
@@ -79,7 +79,10 @@ The dashboard provides real-time monitoring of:
 - Tunnel status and URL
 - Internet connectivity
 - Ping latency with historical data visualization
-- Uptime statistics
+  - Live ping measurements to configurable endpoints
+  - Comprehensive statistics (average, minimum, maximum, and count)
+  - Visual graph showing ping trends over time
+- Uptime statistics and tunnel reliability metrics
 
 ## ⚙️ Configuration
 
