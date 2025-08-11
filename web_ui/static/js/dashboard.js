@@ -414,24 +414,35 @@ function updatePingData(data) {
         // Add statistics to the dashboard
         const statsContainer = document.getElementById('ping-stats-container');
         if (statsContainer) {
-            statsContainer.innerHTML = `
-                <div class="stat-item">
-                    <span class="stat-label">Avg:</span>
-                    <span class="stat-value">${pingStats.avg.toFixed(1)} ms</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Min:</span>
-                    <span class="stat-value">${pingStats.min} ms</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Max:</span>
-                    <span class="stat-value">${pingStats.max} ms</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Count:</span>
-                    <span class="stat-value">${pingStats.count}</span>
-                </div>
-            `;
+            // Update each stat item individually to avoid replacing the entire container
+            const statItems = statsContainer.querySelectorAll('.stat-item');
+            if (statItems.length === 4) {
+                // Update existing stat items
+                statItems[0].querySelector('.stat-value').textContent = `${pingStats.avg.toFixed(1)} ms`;
+                statItems[1].querySelector('.stat-value').textContent = `${pingStats.min} ms`;
+                statItems[2].querySelector('.stat-value').textContent = `${pingStats.max} ms`;
+                statItems[3].querySelector('.stat-value').textContent = `${pingStats.count}`;
+            } else {
+                // Create new stat items if they don't exist
+                statsContainer.innerHTML = `
+                    <div class="stat-item">
+                        <span class="stat-label">Avg:</span>
+                        <span class="stat-value">${pingStats.avg.toFixed(1)} ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Min:</span>
+                        <span class="stat-value">${pingStats.min} ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Max:</span>
+                        <span class="stat-value">${pingStats.max} ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Count:</span>
+                        <span class="stat-value">${pingStats.count}</span>
+                    </div>
+                `;
+            }
         }
     }
     

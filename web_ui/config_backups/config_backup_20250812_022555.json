@@ -1,10 +1,10 @@
 {
-    "tunnel_url": "http://localhost:8080",
+    "tunnel_url": "https://fast.com/",
     "cloudflared_path": null,
     "check_interval": 60,
     "max_retries": 3,
     "retry_delay": 5,
     "debug_mode": false,
     "github_repo": "https://github.com/MeTariqul/Cloudflare-Tunnel-Monitor.git",
-    "ping_test_url": "https://www.youtube.com/"
+    "ping_test_url": "1.1.1.1"
 }
