@@ -7,22 +7,7 @@
     <h1><i class="fas fa-cog"></i> Settings</h1>
     
     <form id="settings-form" class="settings-form">
-        <!-- WhatsApp Settings Section -->
-        <section class="settings-section">
-            <h2><i class="fab fa-whatsapp"></i> WhatsApp Settings</h2>
-            
-            <div class="form-group">
-                <label for="whatsapp_contact">WhatsApp Contact:</label>
-                <input type="text" id="whatsapp_contact" name="whatsapp_contact" value="{{ config.whatsapp_contact }}" required>
-                <div class="help-text">Phone number with country code (e.g., +1234567890) or contact name</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="message_template">Message Template:</label>
-                <textarea id="message_template" name="message_template" rows="3" required>{{ config.message_template }}</textarea>
-                <div class="help-text">Use {timestamp} for current time and {link} for tunnel URL</div>
-            </div>
-        </section>
+        <!-- WhatsApp Settings Section Removed -->
         
         <!-- Tunnel Settings Section -->
         <section class="settings-section">
@@ -34,50 +19,10 @@
                 <div class="help-text">Local service URL to expose (e.g., http://localhost:8080)</div>
             </div>
             
-            <div class="form-group">
-                <label for="cloudflared_path">Cloudflared Path:</label>
-                <div class="input-with-button">
-                    <input type="text" id="cloudflared_path" name="cloudflared_path" value="{{ config.cloudflared_path or '' }}">
-                    <button type="button" class="btn btn-secondary browse-btn" data-target="cloudflared_path">
-                        <i class="fas fa-folder-open"></i> Browse
-                    </button>
-                </div>
-                <div class="help-text">Path to cloudflared executable (leave empty for auto-detection)</div>
-            </div>
+
         </section>
         
-        <!-- Browser Settings Section -->
-        <section class="settings-section">
-            <h2><i class="fas fa-globe"></i> Browser Settings</h2>
-            
-            <div class="form-group">
-                <label for="chrome_path">Chrome Path:</label>
-                <div class="input-with-button">
-                    <input type="text" id="chrome_path" name="chrome_path" value="{{ config.chrome_path or '' }}">
-                    <button type="button" class="btn btn-secondary browse-btn" data-target="chrome_path">
-                        <i class="fas fa-folder-open"></i> Browse
-                    </button>
-                </div>
-                <div class="help-text">Path to Chrome browser executable (leave empty for auto-detection)</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="user_data_dir">User Data Directory:</label>
-                <div class="input-with-button">
-                    <input type="text" id="user_data_dir" name="user_data_dir" value="{{ config.user_data_dir }}">
-                    <button type="button" class="btn btn-secondary browse-btn" data-target="user_data_dir">
-                        <i class="fas fa-folder-open"></i> Browse
-                    </button>
-                </div>
-                <div class="help-text">Directory to store Chrome user data (WhatsApp session)</div>
-            </div>
-            
-            <div class="form-group checkbox-group">
-                <input type="checkbox" id="headless_mode" name="headless_mode" {% if config.headless_mode %}checked{% endif %}>
-                <label for="headless_mode">Headless Mode</label>
-                <div class="help-text">Run Chrome in headless mode (no visible browser window)</div>
-            </div>
-        </section>
+        <!-- Browser Settings Section Removed -->
         
         <!-- Connection Settings Section -->
         <section class="settings-section">
@@ -100,6 +45,8 @@
                 <input type="number" id="retry_delay" name="retry_delay" value="{{ config.retry_delay }}" min="1" max="3600" required>
                 <div class="help-text">Delay between retries (will be multiplied by retry count)</div>
             </div>
+            
+            <!-- Ping Test URL field removed - using 1.1.1.1 as permanent default -->
         </section>
         
         <!-- Advanced Settings Section -->

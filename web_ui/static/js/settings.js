@@ -6,8 +6,7 @@
 const settingsForm = document.getElementById('settings-form');
 const saveButton = document.getElementById('save-settings-button');
 const resetButton = document.getElementById('reset-settings-button');
-const headlessCheckbox = document.getElementById('headless-mode');
-const debugCheckbox = document.getElementById('debug-mode');
+const debugCheckbox = document.getElementById('debug_mode');
 
 // Initialize settings page
 function initSettings() {
@@ -25,18 +24,13 @@ function loadSettings() {
         .then(response => response.json())
         .then(settings => {
             // Populate form fields with current settings
-            document.getElementById('whatsapp-contact').value = settings.whatsapp_contact || '';
-            document.getElementById('message-template').value = settings.message_template || '';
-            document.getElementById('tunnel-url').value = settings.tunnel_url || '';
-            document.getElementById('cloudflared-path').value = settings.cloudflared_path || '';
-            document.getElementById('chrome-path').value = settings.chrome_path || '';
-            document.getElementById('user-data-dir').value = settings.user_data_dir || '';
-            document.getElementById('check-interval').value = settings.check_interval || 60;
-            document.getElementById('max-retries').value = settings.max_retries || 3;
-            document.getElementById('retry-delay').value = settings.retry_delay || 5;
+            document.getElementById('tunnel_url').value = settings.tunnel_url || '';
+            document.getElementById('check_interval').value = settings.check_interval || 60;
+            document.getElementById('max_retries').value = settings.max_retries || 3;
+            document.getElementById('retry_delay').value = settings.retry_delay || 5;
+            // Ping test URL removed - using 1.1.1.1 as permanent default
             
             // Set checkboxes
-            headlessCheckbox.checked = settings.headless_mode || false;
             debugCheckbox.checked = settings.debug_mode || false;
         })
         .catch(error => {
@@ -52,22 +46,17 @@ function saveSettings() {
     
     // Collect form data
     const settings = {
-        whatsapp_contact: document.getElementById('whatsapp-contact').value,
-        message_template: document.getElementById('message-template').value,
-        tunnel_url: document.getElementById('tunnel-url').value,
-        cloudflared_path: document.getElementById('cloudflared-path').value,
-        chrome_path: document.getElementById('chrome-path').value,
-        user_data_dir: document.getElementById('user-data-dir').value,
-        check_interval: parseInt(document.getElementById('check-interval').value),
-        max_retries: parseInt(document.getElementById('max-retries').value),
-        retry_delay: parseInt(document.getElementById('retry-delay').value),
-        headless_mode: headlessCheckbox.checked,
+        tunnel_url: document.getElementById('tunnel_url').value,
+        check_interval: parseInt(document.getElementById('check_interval').value),
+        max_retries: parseInt(document.getElementById('max_retries').value),
+        retry_delay: parseInt(document.getElementById('retry_delay').value),
         debug_mode: debugCheckbox.checked
+        // Ping test URL removed - using 1.1.1.1 as permanent default
     };
     
     // Validate settings
-    if (!settings.whatsapp_contact) {
-        showAlert('WhatsApp contact is required', 'error');
+    if (!settings.tunnel_url) {
+        showAlert('Tunnel URL is required', 'error');
         saveButton.disabled = false;
         saveButton.innerHTML = '<i class="fas fa-save"></i> Save Settings';
         return;

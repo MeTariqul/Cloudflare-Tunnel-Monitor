@@ -3,7 +3,7 @@
 """
 Cloudflare Tunnel Monitor Web UI
 
-A web-based user interface for the Cloudflare Tunnel Monitor with WhatsApp integration.
+A web-based user interface for the Cloudflare Tunnel Monitor.
 This application allows users to configure settings, start/stop the tunnel, and view statistics.
 """
 
@@ -27,54 +27,47 @@ from pathlib import Path
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_socketio import SocketIO, emit
 
-# Selenium imports for WhatsApp Web
-import undetected_chromedriver as uc
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+# Create logs directory if it doesn't exist
+logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+os.makedirs(logs_dir, exist_ok=True)
 
 # Configure logging
+log_file = os.path.join(logs_dir, f'tunnel_monitor_web_{datetime.now().strftime("%Y%m%d")}.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('tunnel_monitor_web.log')
+        logging.FileHandler(log_file)
     ]
 )
 logger = logging.getLogger('tunnel_monitor_web')
+logger.info(f"Logging to {log_file}")
 
 # Default configuration
 DEFAULT_CONFIG = {
-    "whatsapp_contact": "+8801629866954",  # Default WhatsApp contact
-    "tunnel_url": "http://192.168.100.1:8096/",  # Default tunnel URL
-    "chrome_path": None,  # Chrome browser path
-    "cloudflared_path": None,  # Cloudflared executable path
-    "user_data_dir": os.path.join(os.getcwd(), "chrome_user_data"),  # Chrome user data directory
-    "check_interval": 5,  # Internet check interval in seconds
-    "max_retries": 3,  # Maximum number of retries
-    "retry_delay": 5,  # Delay between retries in seconds
-    "message_template": "🌐 New Tunnel Link ({timestamp}):\n{link}",  # Message template
-    "debug_mode": False,  # Debug mode
-    "headless_mode": False,  # Headless mode
+    "tunnel_url": "http://localhost:8080",  # URL to expose via Cloudflare Tunnel
+    "cloudflared_path": None,  # Path to cloudflared executable (None for auto-detection)
+    "check_interval": 60,  # How often to check internet connection (seconds)
+    "max_retries": 3,  # Maximum number of retries when internet connection is lost
+    "retry_delay": 5,  # Delay between retries (seconds)
+    "debug_mode": False,  # Enable debug mode
+    "github_repo": "https://github.com/MeTariqul/Cloudflare-Tunnel-Monitor.git",  # GitHub repository URL
+    "ping_test_url": "1.1.1.1"  # URL to ping for connectivity test
 }
 
 # Statistics
 STATS = {
-    "tunnel_starts": 0,  # Number of times tunnel was started
-    "messages_sent": 0,  # Number of WhatsApp messages sent
-    "internet_disconnects": 0,  # Number of internet disconnections
-    "last_tunnel_url": None,  # Last tunnel URL
-    "start_time": None,  # Start time of the application
+    "start_time": None,  # When the monitor was started
     "total_uptime": 0,  # Total uptime in seconds
+    "tunnel_starts": 0,  # Number of times the tunnel was started
+    "internet_disconnects": 0,  # Number of internet disconnections
+    "last_check": None,  # Last time the internet was checked
     "current_status": "Stopped",  # Current status of the tunnel
+    "last_tunnel_url": None  # Last tunnel URL
 }
 
 # Global variables
-driver = None
 tunnel_process = None
 stop_event = threading.Event()
 log_queue = queue.Queue()
@@ -85,10 +78,14 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)
 socketio = SocketIO(app)
 
+# Auto-open browser flag
+auto_open_browser = True
+
 # Ping data
 ping_data = {
     "last_ping_time": None,
-    "ping_history": []
+    "ping_history": [],
+    "max_history_points": 60  # Store 1 minute of data (assuming 1 ping per second)
 }
 
 # Determine the base directory
@@ -143,12 +140,43 @@ def load_config():
     return config
 
 def save_config(config):
-    """Save configuration to file"""
+    """Save configuration to file with backup"""
     config_path = os.path.join(BASE_DIR, config_file)
+    backup_dir = os.path.join(BASE_DIR, 'config_backups')
+    
+    # Create backup directory if it doesn't exist
+    os.makedirs(backup_dir, exist_ok=True)
+    
     try:
+        # Create a backup of the current config if it exists
+        if os.path.exists(config_path):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = os.path.join(backup_dir, f"config_backup_{timestamp}.json")
+            try:
+                with open(config_path, 'r') as src, open(backup_path, 'w') as dst:
+                    dst.write(src.read())
+                log(f"Configuration backup created at {backup_path}")
+            except Exception as e:
+                log(f"Error creating configuration backup: {e}", level="warning")
+        
+        # Save the new configuration
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=4)
-        log(f"Configuration saved to {config_path}")
+        log(f"Configuration saved to {config_path}", level="success")
+        
+        # Clean up old backups (keep only the 5 most recent)
+        try:
+            backups = sorted([
+                os.path.join(backup_dir, f) for f in os.listdir(backup_dir)
+                if f.startswith("config_backup_") and f.endswith(".json")
+            ], key=os.path.getmtime)
+            
+            for old_backup in backups[:-5]:
+                os.remove(old_backup)
+                log(f"Removed old backup: {old_backup}", level="debug")
+        except Exception as e:
+            log(f"Error cleaning up old backups: {e}", level="warning")
+            
     except Exception as e:
         log(f"Error saving configuration: {e}", level="error")
 
@@ -218,114 +246,7 @@ def internet_available():
         except:
             return False
 
-def setup_driver(config):
-    """Set up and return a Chrome WebDriver with undetected_chromedriver"""
-    global driver
-    
-    options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
-    options.add_argument("--disable-notifications")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    
-    # For headless mode
-    if config["headless_mode"]:
-        options.add_argument("--headless")
-        options.add_argument("--window-size=1920,1080")
-    
-    # Use custom Chrome path if specified
-    if config["chrome_path"] and os.path.exists(config["chrome_path"]):
-        log(f"Using Chrome binary at: {config['chrome_path']}")
-        options.binary_location = config["chrome_path"]
-    
-    # Use custom user data directory if specified
-    if config["user_data_dir"]:
-        user_data_dir = config["user_data_dir"]
-        if not os.path.isabs(user_data_dir):
-            user_data_dir = os.path.join(BASE_DIR, user_data_dir)
-        
-        # Ensure the directory exists
-        os.makedirs(user_data_dir, exist_ok=True)
-        
-        log(f"Using Chrome user data directory: {user_data_dir}")
-        options.add_argument(f"--user-data-dir={user_data_dir}")
-    
-    try:
-        driver = uc.Chrome(options=options)
-        return driver
-    except Exception as e:
-        log(f"Error setting up Chrome driver: {e}", level="error")
-        log("Make sure Chrome is installed on your system.")
-        return None
-
-def send_whatsapp(msg, config):
-    """Send a WhatsApp message using WhatsApp Web"""
-    global driver
-    
-    try:
-        if driver is None:
-            driver = setup_driver(config)
-            if driver is None:
-                return False
-            
-            # Navigate to WhatsApp Web
-            driver.get("https://web.whatsapp.com/")
-            log("Please scan the QR code to log in to WhatsApp Web...")
-            
-            # Wait for the user to scan the QR code and for WhatsApp to load
-            try:
-                WebDriverWait(driver, 60).until(
-                    EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'))
-                )
-                log("Successfully logged in to WhatsApp Web", level="success")
-            except TimeoutException:
-                log("Timeout waiting for WhatsApp Web to load. Please try again.", level="error")
-                driver.quit()
-                driver = None
-                return False
-        
-        # Search for the contact
-        search_box = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'))
-        )
-        search_box.clear()
-        search_box.send_keys(config["whatsapp_contact"])
-        time.sleep(2)
-        
-        # Click on the contact
-        try:
-            contact = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, f'//span[@title="{config["whatsapp_contact"]}"]'))
-            )
-            contact.click()
-            time.sleep(1)
-        except TimeoutException:
-            log(f"Contact '{config['whatsapp_contact']}' not found. Please check the contact name.", level="error")
-            return False
-        
-        # Find the message input box and send the message
-        message_box = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
-        )
-        message_box.clear()
-        message_box.send_keys(msg)
-        message_box.send_keys(Keys.ENTER)
-        
-        log(f"Sent WhatsApp message: {msg}", level="success")
-        STATS["messages_sent"] += 1
-        return True
-    except Exception as e:
-        log(f"WhatsApp send failed: {e}", level="error")
-        # If there's an error, try to reset the driver
-        if driver:
-            try:
-                driver.quit()
-            except:
-                pass
-            driver = None
-        return False
+# WebDriver setup function removed
 
 def run_tunnel(config):
     """Run cloudflared tunnel and return the process"""
@@ -370,14 +291,7 @@ def run_tunnel(config):
                     STATS["last_tunnel_url"] = tunnel_url
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # Format the message using the template
-                    message = config["message_template"].format(
-                        timestamp=timestamp,
-                        link=tunnel_url
-                    )
-                    
-                    # Send the message via WhatsApp
-                    send_whatsapp(message, config)
+                    # WhatsApp notification removed
                     
                     # Emit the tunnel URL to connected clients
                     socketio.emit('tunnel_url', {'url': tunnel_url})
@@ -422,12 +336,14 @@ def ping_monitor_thread():
     """Thread function to monitor ping and emit data to clients"""
     global ping_data
     
-    # Keep track of the last 60 ping times (1 minute at 1 ping per second)
-    max_history_size = 60
+    # Use the max_history_points from ping_data for 1 minute of data
+    max_history_size = ping_data["max_history_points"]
     
     while not stop_event.is_set():
-        # Get the current ping time
-        ping_time = ping_host("1.1.1.1")
+        # Get the current ping time using the configured ping_test_url
+        config = load_config()
+        ping_url = config.get("ping_test_url", "1.1.1.1")
+        ping_time = ping_host(ping_url)
         
         # Update ping data
         ping_data["last_ping_time"] = ping_time
@@ -438,10 +354,14 @@ def ping_monitor_thread():
         if len(ping_data["ping_history"]) > max_history_size:
             ping_data["ping_history"].pop(0)
         
+        # Calculate statistics
+        stats = calculate_ping_stats(ping_data["ping_history"])
+        
         # Emit the ping data to all connected clients
         socketio.emit('ping_data', {
             'last_ping_time': ping_time,
-            'ping_history': [ping_data["ping_history"][-1]]  # Just send the latest entry
+            'ping_history': ping_data["ping_history"],
+            'stats': stats
         })
         
         # Wait for 1 second before the next ping
@@ -514,15 +434,6 @@ def monitor_thread_func(config):
 def cleanup():
     """Clean up resources before exiting"""
     stop_tunnel()
-    
-    global driver
-    if driver:
-        try:
-            log("Closing Chrome WebDriver...")
-            driver.quit()
-        except:
-            pass
-        driver = None
 
 # Flask routes
 @app.route('/')
@@ -531,16 +442,62 @@ def index():
     config = load_config()
     return render_template('index.html', config=config, stats=STATS)
 
+@app.route('/ping_test')
+def ping_test():
+    """Ping a host and return the result"""
+    config = load_config()
+    host = request.args.get('host', config.get('ping_test_url', '1.1.1.1'))
+    result = ping_host(host)
+    
+    # Update ping history
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    ping_data["last_ping_time"] = timestamp
+    
+    if result is not None:
+        ping_data["ping_history"].append({
+            "timestamp": timestamp,
+            "value": result
+        })
+        
+        # Keep only the last minute of ping results
+        if len(ping_data["ping_history"]) > ping_data["max_history_points"]:
+            ping_data["ping_history"].pop(0)
+        
+        # Calculate statistics
+        ping_values = [p["value"] for p in ping_data["ping_history"]]
+        avg_ping = sum(ping_values) / len(ping_values) if ping_values else 0
+        min_ping = min(ping_values) if ping_values else 0
+        max_ping = max(ping_values) if ping_values else 0
+        
+        return jsonify({
+            "success": True,
+            "ping": result,
+            "timestamp": timestamp,
+            "host": host,
+            "stats": {
+                "avg": round(avg_ping, 2),
+                "min": round(min_ping, 2),
+                "max": round(max_ping, 2),
+                "count": len(ping_values)
+            }
+        })
+    else:
+        return jsonify({
+            "success": False,
+            "error": "Ping failed",
+            "timestamp": timestamp,
+            "host": host
+        })
+
 @app.route('/settings')
 def settings():
-    """Render the settings page"""
+    """Settings page"""
     config = load_config()
     return render_template('settings.html', config=config)
 
-@app.route('/logs')
-def logs():
-    """Render the logs page"""
-    return render_template('logs.html')
+# Update ping URL route removed - using 1.1.1.1 as permanent default
+
+# Logs page route removed
 
 @app.route('/api/start', methods=['POST'])
 def api_start():
@@ -576,43 +533,42 @@ def api_stop():
     log("Monitor stopped", level="warning")
     return jsonify({"status": "success", "message": "Tunnel monitor stopped"})
 
-@app.route('/api/test_whatsapp', methods=['POST'])
-def api_test_whatsapp():
-    """Test WhatsApp message sending"""
-    config = load_config()
-    
-    # Send a test message
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    message = f"🧪 Test Message ({timestamp})"
-    
-    if send_whatsapp(message, config):
-        return jsonify({"status": "success", "message": "Test message sent successfully"})
-    else:
-        return jsonify({"status": "error", "message": "Failed to send test message"})
+# WhatsApp test endpoint removed
 
-@app.route('/api/save_settings', methods=['POST'])
-def api_save_settings():
-    """Save settings"""
+@app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    """Get or save settings"""
     config = load_config()
     
-    # Update configuration with form data
-    config["whatsapp_contact"] = request.form.get("whatsapp_contact", config["whatsapp_contact"])
-    config["tunnel_url"] = request.form.get("tunnel_url", config["tunnel_url"])
-    config["chrome_path"] = request.form.get("chrome_path", config["chrome_path"])
-    config["cloudflared_path"] = request.form.get("cloudflared_path", config["cloudflared_path"])
-    config["user_data_dir"] = request.form.get("user_data_dir", config["user_data_dir"])
-    config["check_interval"] = int(request.form.get("check_interval", config["check_interval"]))
-    config["max_retries"] = int(request.form.get("max_retries", config["max_retries"]))
-    config["retry_delay"] = int(request.form.get("retry_delay", config["retry_delay"]))
-    config["message_template"] = request.form.get("message_template", config["message_template"])
-    config["debug_mode"] = request.form.get("debug_mode") == "on"
-    config["headless_mode"] = request.form.get("headless_mode") == "on"
-    
-    # Save the updated configuration
-    save_config(config)
-    
-    flash("Settings saved successfully", "success")
-    return redirect(url_for('settings'))
+    if request.method == 'POST':
+        try:
+            # Get JSON data from request
+            data = request.get_json()
+            
+            # Update configuration with JSON data
+            config["tunnel_url"] = data.get("tunnel_url", config["tunnel_url"])
+            config["check_interval"] = int(data.get("check_interval", config["check_interval"]))
+            config["max_retries"] = int(data.get("max_retries", config["max_retries"]))
+            config["retry_delay"] = int(data.get("retry_delay", config["retry_delay"]))
+            config["ping_test_url"] = data.get("ping_test_url", config["ping_test_url"])
+            config["debug_mode"] = data.get("debug_mode", config["debug_mode"])
+            
+            # Save the updated configuration
+            save_config(config)
+            
+            return jsonify({"status": "success", "message": "Settings saved successfully"})
+        except Exception as e:
+            logger.error(f"Error saving settings: {e}")
+            return jsonify({"status": "error", "message": str(e)})
+    else:
+        # Return current settings
+        return jsonify(config)
+
+@app.route('/api/settings/reset', methods=['POST'])
+def api_reset_settings():
+    """Reset settings to defaults"""
+    config = reset_config()
+    return jsonify({"status": "success", "message": "Settings reset to defaults"})
 
 @app.route('/api/stats')
 def api_stats():
@@ -635,57 +591,52 @@ def api_logs():
     
     return jsonify(logs)
 
-@app.route('/api/settings')
-def api_settings():
-    """Get current settings"""
-    config = load_config()
-    return jsonify(config)
-
-@app.route('/api/settings', methods=['POST'])
-def api_settings_update():
-    """Update settings via JSON"""
-    config = load_config()
-    
-    # Get JSON data from request
-    data = request.get_json()
-    if not data:
-        return jsonify({"status": "error", "message": "No data provided"})
-    
-    # Update configuration with JSON data
-    for key in data:
-        if key in config:
-            config[key] = data[key]
-    
-    # Save the updated configuration
-    save_config(config)
-    
-    return jsonify({"status": "success", "message": "Settings saved successfully"})
-
-@app.route('/api/settings/reset', methods=['POST'])
-def api_settings_reset():
-    """Reset settings to default values"""
-    # Create default configuration
-    config = DEFAULT_CONFIG.copy()
-    
-    # Save the default configuration
-    save_config(config)
-    
-    log("Settings reset to defaults", level="warning")
-    return jsonify({"status": "success", "message": "Settings reset to defaults"})
+# API settings routes moved to new implementation
 
 @app.route('/api/ping')
 def api_ping():
-    """Get current ping data"""
+    """Get current ping data with statistics"""
     global ping_data
     
     # If ping monitoring hasn't started yet, return None
     if ping_data["last_ping_time"] is None:
-        return jsonify({"last_ping_time": None, "ping_history": []})
+        return jsonify({"last_ping_time": None, "ping_history": [], "stats": None})
+    
+    # Calculate statistics from ping history
+    stats = calculate_ping_stats(ping_data["ping_history"])
     
     return jsonify({
         "last_ping_time": ping_data["last_ping_time"],
-        "ping_history": ping_data["ping_history"]
+        "ping_history": ping_data["ping_history"],
+        "stats": stats
     })
+
+def calculate_ping_stats(ping_history):
+    """Calculate statistics from ping history"""
+    if not ping_history:
+        return {
+            "avg": 0,
+            "min": 0,
+            "max": 0,
+            "count": 0
+        }
+    
+    ping_times = [entry["value"] for entry in ping_history if "value" in entry]
+    
+    if not ping_times:
+        return {
+            "avg": 0,
+            "min": 0,
+            "max": 0,
+            "count": 0
+        }
+    
+    return {
+        "avg": sum(ping_times) / len(ping_times),
+        "min": min(ping_times),
+        "max": max(ping_times),
+        "count": len(ping_times)
+    }
 
 # Socket.IO events
 @socketio.on('connect')
@@ -702,10 +653,16 @@ def handle_connect():
     # Send current ping data if available
     global ping_data
     if ping_data["last_ping_time"] is not None:
+        # Calculate statistics
+        stats = calculate_ping_stats(ping_data["ping_history"])
+        
         emit('ping_data', {
             'last_ping_time': ping_data["last_ping_time"],
-            'ping_history': ping_data["ping_history"]
+            'ping_history': ping_data["ping_history"],
+            'stats': stats
         })
+
+# Remove any references to the logs route that was deleted
 
 # Main function
 def main():
@@ -719,15 +676,31 @@ def main():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         while port < 5100:
             try:
-                s.bind(('localhost', port))
+                s.bind(('0.0.0.0', port))
                 s.close()
                 break
             except socket.error:
                 port += 1
+                # If we've tried 100 ports and none are available, use a random high port
+                if port >= 5100:
+                    import random
+                    port = random.randint(8000, 9000)
         
         # Start the web server
         host = '0.0.0.0'  # Listen on all interfaces
         log(f"Starting web server on http://{host}:{port}")
+        
+        # Check if auto_open_browser is enabled via environment variable
+        global auto_open_browser
+        auto_open_browser = os.environ.get('FLASK_AUTO_OPEN_BROWSER', '1') == '1'
+        
+        # Auto-open browser
+        if auto_open_browser:
+            import webbrowser
+            url = f"http://localhost:{port}"
+            threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+            log(f"Opening browser to {url}")
+        
         socketio.run(app, host=host, port=port, debug=config["debug_mode"])
     except Exception as e:
         log(f"Error: {e}", level="error")
