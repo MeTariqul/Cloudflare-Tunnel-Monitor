@@ -5,21 +5,6 @@ import requests
 import os
 import signal
 
-# Twilio WhatsApp Config
-TWILIO_SID = "your_twilio_sid"
-TWILIO_AUTH = "your_twilio_auth"
-WHATSAPP_FROM = "whatsapp:+14155238886"  # Twilio sandbox
-WHATSAPP_TO = "whatsapp:+8801XXXXXXXXX"  # Your number
-
-def send_whatsapp(msg):
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json"
-    data = {"From": WHATSAPP_FROM, "To": WHATSAPP_TO, "Body": msg}
-    try:
-        requests.post(url, data=data, auth=(TWILIO_SID, TWILIO_AUTH))
-        print(f"✅ Sent WhatsApp: {msg}")
-    except Exception as e:
-        print(f"❌ WhatsApp send failed: {e}")
-
 def internet_available():
     try:
         requests.get("https://1.1.1.1", timeout=3)
@@ -36,7 +21,7 @@ def run_tunnel():
         print(line.strip())
         match = re.search(r"https://[-\w]+\.trycloudflare\.com", line)
         if match:
-            send_whatsapp(f"New Tunnel Link: {match.group(0)}")
+            print(f"✅ New Tunnel Link: {match.group(0)}")
     return process
 
 def main():

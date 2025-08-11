@@ -1,6 +1,24 @@
 @echo off
 REM Script to download the latest cloudflared executable for Windows
 
+echo Checking for existing cloudflared installation...
+
+REM Check if cloudflared.exe already exists in the current directory
+if exist "cloudflared.exe" (
+    echo cloudflared.exe already exists in the current directory.
+    echo Skipping download process.
+    goto :update_path
+)
+
+REM Check if cloudflared is available in PATH
+where cloudflared >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    echo cloudflared is already available in your PATH.
+    echo Skipping download process.
+    goto :update_path
+)
+
+echo No existing cloudflared installation found.
 echo Downloading the latest cloudflared for Windows...
 
 REM Create a temporary directory for downloads
@@ -38,11 +56,11 @@ echo.
 echo cloudflared has been downloaded successfully!
 echo Location: %CD%\cloudflared.exe
 
-REM Update the cloudflared path in the script
+:update_path
 echo Updating the cloudflared path in the tunnel monitor script...
 powershell -Command "$path = '%CD%\cloudflared.exe'; $path = $path -replace '\\', '\\\\'; (Get-Content 'tunnel_monitor_selenium.py') -replace '(CLOUDFLARED_PATH = ).*', ('$1"' + $path + '"') | Set-Content 'tunnel_monitor_selenium.py'"
 
-echo The tunnel monitor script has been updated to use the downloaded cloudflared.
+echo The tunnel monitor script has been updated to use the cloudflared.
 
 :cleanup
 REM Clean up temporary files

@@ -14,8 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-# WhatsApp contact name to send messages to
-WHATSAPP_CONTACT = "Your Contact Name"  # Change this to your contact name
+# Configuration for tunnel monitoring
 
 # URL to tunnel
 TUNNEL_URL = "http://localhost:8080"  # Change this to your local service URL
@@ -74,69 +73,7 @@ def setup_driver():
         print("Make sure Chrome is installed on your system.")
         sys.exit(1)
 
-def send_whatsapp(msg):
-    """Send a WhatsApp message using WhatsApp Web"""
-    global driver
-    
-    try:
-        if driver is None:
-            driver = setup_driver()
-            
-            # Navigate to WhatsApp Web
-            driver.get("https://web.whatsapp.com/")
-            print("Please scan the QR code to log in to WhatsApp Web...")
-            
-            # Wait for the user to scan the QR code and for WhatsApp to load
-            try:
-                WebDriverWait(driver, 60).until(
-                    EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'))
-                )
-                print("Successfully logged in to WhatsApp Web")
-            except TimeoutException:
-                print("Timeout waiting for WhatsApp Web to load. Please try again.")
-                driver.quit()
-                driver = None
-                return False
-        
-        # Search for the contact
-        search_box = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'))
-        )
-        search_box.clear()
-        search_box.send_keys(WHATSAPP_CONTACT)
-        time.sleep(2)
-        
-        # Click on the contact
-        try:
-            contact = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, f'//span[@title="{WHATSAPP_CONTACT}"]'))
-            )
-            contact.click()
-            time.sleep(1)
-        except TimeoutException:
-            print(f"Contact '{WHATSAPP_CONTACT}' not found. Please check the contact name.")
-            return False
-        
-        # Find the message input box and send the message
-        message_box = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
-        )
-        message_box.clear()
-        message_box.send_keys(msg)
-        message_box.send_keys(Keys.ENTER)
-        
-        print(f"✅ Sent WhatsApp message: {msg}")
-        return True
-    except Exception as e:
-        print(f"❌ WhatsApp send failed: {e}")
-        # If there's an error, try to reset the driver
-        if driver:
-            try:
-                driver.quit()
-            except:
-                pass
-            driver = None
-        return False
+# WhatsApp functionality removed
 
 def internet_available():
     """Check if internet connection is available"""
@@ -176,8 +113,7 @@ def run_tunnel():
         if match and not tunnel_url:
             tunnel_url = match.group(0)
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            message = f"🌐 New Tunnel Link ({timestamp}):\n{tunnel_url}"
-            send_whatsapp(message)
+            print(f"🌐 New Tunnel Link ({timestamp}):\n{tunnel_url}")
     
     return process
 
@@ -185,21 +121,14 @@ def main():
     """Main function to run the tunnel monitor"""
     global driver
     
-    print("Starting Cloudflare Tunnel Monitor with WhatsApp Web notifications")
-    print(f"Messages will be sent to: {WHATSAPP_CONTACT}")
+    print("Starting Cloudflare Tunnel Monitor")
     print("Press Ctrl+C to exit")
     
-    # Set up the WebDriver for WhatsApp Web
+    # Set up the WebDriver for monitoring
     try:
         driver = setup_driver()
         
-        # Navigate to WhatsApp Web and wait for login
-        driver.get("https://web.whatsapp.com/")
-        print("\n===========================================================")
-        print("IMPORTANT: Please scan the QR code to log in to WhatsApp Web")
-        print("===========================================================\n")
-        
-        # Wait for the user to scan the QR code
+        # Initialize the monitoring process
         try:
             WebDriverWait(driver, 120).until(
                 EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'))

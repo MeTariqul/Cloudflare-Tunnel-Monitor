@@ -1,5 +1,5 @@
 @echo off
-echo Starting Cloudflare Tunnel Monitor with WhatsApp Web notifications...
+echo Starting Cloudflare Tunnel Monitor...
 
 :: Check if virtual environment exists, if not create it
 if not exist venv (
@@ -17,8 +17,8 @@ if not exist venv (
 :: Run the tunnel monitor
 echo Running tunnel monitor...
 echo.
-echo IMPORTANT: You will need to scan the QR code to authenticate WhatsApp Web
-echo when the browser window opens.
+echo Starting the monitoring process...
+echo The tunnel URL will be displayed in the console when available.
 echo.
 python tunnel_monitor_selenium.py
 

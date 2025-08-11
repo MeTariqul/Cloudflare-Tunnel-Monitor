@@ -5,7 +5,7 @@ A modern web-based interface for the Cloudflare Tunnel Monitor, providing a user
 ## Features
 
 - **Dashboard**: Real-time monitoring of tunnel status, internet connectivity, and statistics
-- **Settings Management**: Configure WhatsApp integration, tunnel settings, and more
+- **Settings Management**: Configure tunnel settings and monitoring parameters
 - **Logs Viewer**: View and filter logs by type (info, success, warning, error, debug)
 - **Responsive Design**: Works on desktop and mobile devices
 - **Cross-Platform**: Compatible with Windows and Ubuntu/Linux
@@ -14,7 +14,7 @@ A modern web-based interface for the Cloudflare Tunnel Monitor, providing a user
 
 - Python 3.7 or higher
 - Flask and Flask-SocketIO for the web server
-- Selenium and undetected-chromedriver for WhatsApp integration
+
 - A modern web browser (Chrome, Firefox, Edge, etc.)
 - Cloudflared executable (same as the original Cloudflare Tunnel Monitor)
 
@@ -23,7 +23,7 @@ A modern web-based interface for the Cloudflare Tunnel Monitor, providing a user
 ### 1. Install Python Dependencies
 
 ```bash
-pip install flask flask-socketio selenium undetected-chromedriver requests
+pip install flask flask-socketio requests
 ```
 
 ### 2. Ensure Cloudflared is Installed
@@ -46,10 +46,10 @@ The dashboard provides a real-time overview of your tunnel:
 
 - **Tunnel Control**: Start and stop the tunnel
 - **Status Indicators**: Monitor tunnel and internet status
-- **Statistics**: View tunnel starts, messages sent, internet disconnects, and uptime
+- **Statistics**: View tunnel starts, internet disconnects, and uptime
 - **Tunnel URL**: View and copy the current tunnel URL
 - **QR Code**: Scan to quickly access the tunnel URL on mobile devices
-- **WhatsApp Testing**: Test WhatsApp message sending
+
 - **Recent Activity**: View the most recent log entries
 
 ### Settings

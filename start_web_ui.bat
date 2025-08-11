@@ -30,6 +30,8 @@ pip install -r web_ui\requirements.txt
 :: Start the web UI
 echo Starting web UI...
 cd web_ui
+:: Set auto_open_browser flag to true
+set FLASK_AUTO_OPEN_BROWSER=1
 python app.py
 
 :: Deactivate virtual environment when done

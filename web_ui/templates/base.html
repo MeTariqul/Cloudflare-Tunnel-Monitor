@@ -21,7 +21,6 @@
             <nav class="mobile-hidden" id="main-nav">
                 <ul>
                     <li><a href="{{ url_for('index') }}" {% if request.path == url_for('index') %}class="active"{% endif %}><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                    <li><a href="{{ url_for('logs') }}" {% if request.path == url_for('logs') %}class="active"{% endif %}><i class="fas fa-list"></i> Logs</a></li>
                     <li><a href="{{ url_for('settings') }}" {% if request.path == url_for('settings') %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a></li>
                 </ul>
             </nav>
@@ -43,7 +42,7 @@
         </main>
 
         <footer>
-            <p>&copy; {{ current_year }} Cloudflare Tunnel Monitor | <a href="https://github.com/yourusername/cloudflare_tunnel_monitor" target="_blank">GitHub</a></p>
+            <p>&copy; {{ current_year }} Cloudflare Tunnel Monitor | <a href="{{ config.github_repo }}" target="_blank">GitHub</a></p>
         </footer>
     </div>
 

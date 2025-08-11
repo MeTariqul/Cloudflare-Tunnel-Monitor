@@ -447,6 +447,44 @@ footer {
     grid-column: span 12;
 }
 
+.ping-stats-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: var(--spacing-md) 0;
+}
+
+.ping-stats-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    width: 100%;
+    max-width: 600px;
+}
+
+.ping-stats-container .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--spacing-sm);
+    min-width: 80px;
+}
+
+.ping-stats-container .stat-label {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin-bottom: var(--spacing-xs);
+}
+
+.ping-stats-container .stat-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
 /* Statistics Grid */
 .stats-grid {
     display: grid;
@@ -522,35 +560,7 @@ footer {
     padding: var(--spacing-md);
 }
 
-/* WhatsApp Info */
-.whatsapp-info {
-    margin-top: var(--spacing-sm);
-}
-
-.info-item {
-    margin-bottom: var(--spacing-sm);
-    display: flex;
-    align-items: flex-start;
-}
-
-.info-label {
-    font-weight: 500;
-    min-width: 120px;
-}
-
-.info-value {
-    color: var(--text-color);
-}
-
-.message-template {
-    font-family: monospace;
-    background-color: var(--light-color);
-    padding: var(--spacing-sm);
-    border-radius: var(--border-radius-sm);
-    display: block;
-    margin-top: var(--spacing-xs);
-    white-space: pre-wrap;
-}
+/* WhatsApp Info styles removed */
 
 /* Logs */
 .logs-container {

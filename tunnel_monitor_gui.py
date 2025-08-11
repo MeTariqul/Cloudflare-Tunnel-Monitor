@@ -3,7 +3,7 @@
 """
 Cloudflare Tunnel Monitor GUI
 
-A graphical user interface for the Cloudflare Tunnel Monitor with WhatsApp integration.
+A graphical user interface for the Cloudflare Tunnel Monitor.
 This application allows users to configure settings, start/stop the tunnel, and view statistics.
 """
 
@@ -32,7 +32,6 @@ from PIL import Image, ImageTk
 
 # Default configuration
 DEFAULT_CONFIG = {
-    "whatsapp_contact": "+8801629866954",  # Default WhatsApp contact
     "tunnel_url": "http://192.168.100.1:8096/",  # Default tunnel URL
     "chrome_path": None,  # Chrome browser path
     "cloudflared_path": None,  # Cloudflared executable path
@@ -40,7 +39,7 @@ DEFAULT_CONFIG = {
     "check_interval": 5,  # Internet check interval in seconds
     "max_retries": 3,  # Maximum number of retries
     "retry_delay": 5,  # Delay between retries in seconds
-    "message_template": "🌐 New Tunnel Link ({timestamp}):\n{link}",  # Message template
+    "ping_test_url": "1.1.1.1",  # URL or IP to ping for connectivity tests
     "debug_mode": False,  # Debug mode
     "headless_mode": False,  # Headless mode
 }
@@ -48,7 +47,6 @@ DEFAULT_CONFIG = {
 # Statistics
 STATS = {
     "tunnel_starts": 0,  # Number of times tunnel was started
-    "messages_sent": 0,  # Number of WhatsApp messages sent
     "internet_disconnects": 0,  # Number of internet disconnections
     "last_tunnel_url": None,  # Last tunnel URL
     "start_time": None,  # Start time of the application
@@ -182,22 +180,18 @@ def internet_available():
     except:
         return False
 
-# Send WhatsApp message
-def send_whatsapp(msg, config):
-    """Send a WhatsApp message using WhatsApp Web"""
-    global driver
+# Ping test function
+def ping_test(host=None):
+    """Test connectivity to a host"""
+    if host is None:
+        host = "1.1.1.1"
     
     try:
-        if driver is None:
-            driver = setup_driver(config)
-            if driver is None:
-                log("Failed to initialize WebDriver", level="error")
-                return False
-                
-            # Navigate to WhatsApp Web
-            driver.get("https://web.whatsapp.com/")
-            log("Please scan the QR code to log in to WhatsApp Web...")
-            
+        response = requests.get(f"http://{host}", timeout=3)
+        return response.status_code < 400
+    except:
+        return False
+    
             # Wait for the user to scan the QR code and for WhatsApp to load
             try:
                 WebDriverWait(driver, 60).until(
@@ -295,14 +289,8 @@ def run_tunnel(config):
                     STATS["last_tunnel_url"] = tunnel_url
                     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # Format the message using the template
-                    message = config["message_template"].format(
-                        timestamp=timestamp,
-                        link=tunnel_url
-                    )
-                    
-                    # Send the message via WhatsApp
-                    send_whatsapp(message, config)
+                        # Log the new tunnel URL
+                    log(f"New tunnel URL: {tunnel_url}", level="success")
         
         # Start the monitoring thread
         monitor_thread = threading.Thread(target=monitor_output)

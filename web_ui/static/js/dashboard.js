@@ -7,23 +7,21 @@
 // DOM Elements
 const startButton = document.getElementById('start-button');
 const stopButton = document.getElementById('stop-button');
-const testWhatsappButton = document.getElementById('test-whatsapp-button');
 const tunnelStatusIndicator = document.getElementById('tunnel-status-indicator');
 const tunnelStatusText = document.getElementById('tunnel-status-text');
 const internetStatusIndicator = document.getElementById('internet-status-indicator');
 const internetStatusText = document.getElementById('internet-status-text');
 const pingValueElement = document.getElementById('ping-value');
 const tunnelStartsElement = document.getElementById('tunnel-starts');
-const messagesSentElement = document.getElementById('messages-sent');
 const internetDisconnectsElement = document.getElementById('internet-disconnects');
 const uptimeElement = document.getElementById('uptime');
 const lastCheckElement = document.getElementById('last-check');
 const tunnelUrlElement = document.getElementById('tunnel-url');
 const copyUrlButton = document.getElementById('copy-url-button');
 const qrcodeContainer = document.getElementById('qrcode');
-const whatsappContactElement = document.getElementById('whatsapp-contact');
 const recentLogsContainer = document.getElementById('recent-logs-container');
 const pingChartCanvas = document.getElementById('ping-chart');
+// WhatsApp-related elements removed
 
 // QR Code instance
 let qrcode = null;
@@ -40,7 +38,24 @@ let pingData = {
         borderWidth: 2,
         tension: 0.2,
         fill: true
+    },
+    {
+        label: 'Average',
+        data: [],
+        borderColor: 'rgb(46, 204, 113)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        fill: false
     }]
+};
+
+// Ping statistics
+let pingStats = {
+    avg: 0,
+    min: 0,
+    max: 0,
+    count: 0
 };
 
 // Ping Chart configuration
@@ -97,7 +112,6 @@ function initDashboard() {
     // Set up button event listeners
     startButton.addEventListener('click', startTunnel);
     stopButton.addEventListener('click', stopTunnel);
-    testWhatsappButton.addEventListener('click', testWhatsapp);
     copyUrlButton.addEventListener('click', copyTunnelUrl);
     
     // Initialize ping chart
@@ -192,31 +206,7 @@ function stopTunnel() {
     });
 }
 
-// Test WhatsApp message sending
-function testWhatsapp() {
-    testWhatsappButton.disabled = true;
-    testWhatsappButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
-    
-    fetch('/api/test_whatsapp', {
-        method: 'POST',
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            showAlert('Test message sent successfully', 'success');
-        } else {
-            showAlert(data.message, 'error');
-        }
-        testWhatsappButton.disabled = false;
-        testWhatsappButton.innerHTML = '<i class="fab fa-whatsapp"></i> Test WhatsApp';
-    })
-    .catch(error => {
-        console.error('Error testing WhatsApp:', error);
-        showAlert('Failed to test WhatsApp', 'error');
-        testWhatsappButton.disabled = false;
-        testWhatsappButton.innerHTML = '<i class="fab fa-whatsapp"></i> Test WhatsApp';
-    });
-}
+// WhatsApp test function removed
 
 // Copy tunnel URL to clipboard
 function copyTunnelUrl() {
@@ -288,25 +278,24 @@ function fetchStats() {
         .then(response => response.json())
         .then(stats => {
             // Update statistics
-            tunnelStartsElement.textContent = stats.tunnel_starts;
-            messagesSentElement.textContent = stats.messages_sent;
-            internetDisconnectsElement.textContent = stats.internet_disconnects;
-            
-            // Update uptime
-            if (stats.total_uptime) {
-                uptimeElement.textContent = formatUptime(stats.total_uptime);
-            }
-            
-            // Update status
-            updateStatus(stats.current_status);
-            
-            // Update tunnel URL if available
-            if (stats.last_tunnel_url) {
-                updateTunnelUrl(stats.last_tunnel_url);
-            }
-            
-            // Update last check time
-            lastCheckElement.textContent = new Date().toLocaleTimeString();
+    tunnelStartsElement.textContent = stats.tunnel_starts;
+    internetDisconnectsElement.textContent = stats.internet_disconnects;
+    
+    // Update uptime
+    if (stats.total_uptime) {
+        uptimeElement.textContent = formatUptime(stats.total_uptime);
+    }
+    
+    // Update status
+    updateStatus(stats.current_status);
+    
+    // Update tunnel URL if available
+    if (stats.last_tunnel_url) {
+        updateTunnelUrl(stats.last_tunnel_url);
+    }
+    
+    // Update last check time
+    lastCheckElement.textContent = new Date().toLocaleTimeString();
         })
         .catch(error => {
             console.error('Error fetching stats:', error);
@@ -418,19 +407,51 @@ function updatePingData(data) {
         pingValueElement.className = 'ping-value unavailable';
     }
     
+    // Update ping statistics if available
+    if (data.stats) {
+        pingStats = data.stats;
+        
+        // Add statistics to the dashboard
+        const statsContainer = document.getElementById('ping-stats-container');
+        if (statsContainer) {
+            statsContainer.innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-label">Avg:</span>
+                    <span class="stat-value">${pingStats.avg.toFixed(1)} ms</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Min:</span>
+                    <span class="stat-value">${pingStats.min} ms</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Max:</span>
+                    <span class="stat-value">${pingStats.max} ms</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Count:</span>
+                    <span class="stat-value">${pingStats.count}</span>
+                </div>
+            `;
+        }
+    }
+    
     // Update the ping chart if we have history data
     if (pingChart && data.ping_history && data.ping_history.length > 0) {
-        // Clear existing data if we have more than 60 points
-        if (pingData.labels.length >= 60) {
-            pingData.labels = [];
-            pingData.datasets[0].data = [];
-        }
+        // Reset data for the last minute view
+        pingData.labels = [];
+        pingData.datasets[0].data = [];
+        pingData.datasets[1].data = [];
         
         // Add new data points
         data.ping_history.forEach(item => {
             const time = new Date(item.timestamp * 1000).toLocaleTimeString();
             pingData.labels.push(time);
             pingData.datasets[0].data.push(item.ping_time);
+            
+            // Add average line if we have stats
+            if (data.stats && data.stats.avg) {
+                pingData.datasets[1].data.push(data.stats.avg);
+            }
         });
         
         // Update the chart

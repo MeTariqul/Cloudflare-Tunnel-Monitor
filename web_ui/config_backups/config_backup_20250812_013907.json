@@ -1,5 +1,5 @@
 {
-    "tunnel_url": "http://172.16.50.4/",
+    "tunnel_url": "http://localhost:8080",
     "cloudflared_path": null,
     "check_interval": 60,
     "max_retries": 3,
