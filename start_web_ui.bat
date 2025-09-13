@@ -9,9 +9,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Check if web_ui directory exists
-if not exist "web_ui" (
-    echo web_ui directory not found. Please make sure you're running this script from the correct location.
+:: Check if app.py exists
+if not exist "app.py" (
+    echo app.py not found. Please make sure you're running this script from the correct location.
     pause
     exit /b 1
 )
@@ -25,17 +25,15 @@ if not exist "venv" (
 :: Activate virtual environment and install dependencies
 echo Activating virtual environment and installing dependencies...
 call venv\Scripts\activate.bat
-pip install -r web_ui\requirements.txt
+pip install -r requirements.txt
 
 :: Start the web UI
 echo Starting web UI...
-cd web_ui
 :: Set auto_open_browser flag to true
 set FLASK_AUTO_OPEN_BROWSER=1
 python app.py
 
 :: Deactivate virtual environment when done
-cd ..
 call venv\Scripts\deactivate.bat
 
 pause

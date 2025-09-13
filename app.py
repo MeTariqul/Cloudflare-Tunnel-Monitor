@@ -26,6 +26,7 @@ from pathlib import Path
 # Flask imports
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_socketio import SocketIO, emit
+from datetime import datetime as dt
 
 # Create logs directory if it doesn't exist
 logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -73,10 +74,15 @@ stop_event = threading.Event()
 log_queue = queue.Queue()
 config_file = "tunnel_monitor_config.json"
 
-# Initialize Flask app
+# Initialize Flask app with enhanced security
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
-socketio = SocketIO(app)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Initialize SocketIO with CORS support
+socketio = SocketIO(app, cors_allowed_origins="*", ping_timeout=60, ping_interval=25)
 
 # Auto-open browser flag
 auto_open_browser = True
@@ -246,8 +252,6 @@ def internet_available():
         except:
             return False
 
-# WebDriver setup function removed
-
 def run_tunnel(config):
     """Run cloudflared tunnel and return the process"""
     global tunnel_process
@@ -277,24 +281,23 @@ def run_tunnel(config):
         # Create a thread to monitor the output
         def monitor_output():
             tunnel_url = None
-            for line in iter(tunnel_process.stdout.readline, ''):
-                if stop_event.is_set():
-                    break
+            if tunnel_process and tunnel_process.stdout:
+                for line in iter(tunnel_process.stdout.readline, ''):
+                    if stop_event.is_set():
+                        break
+                        
+                    line = line.strip()
+                    log(f"Cloudflared: {line}", level="debug" if config["debug_mode"] else "info")
                     
-                line = line.strip()
-                log(f"Cloudflared: {line}", level="debug" if config["debug_mode"] else "info")
-                
-                # Look for the tunnel URL in the output
-                match = re.search(r"https://[-\w]+\.trycloudflare\.com", line)
-                if match and not tunnel_url:
-                    tunnel_url = match.group(0)
-                    STATS["last_tunnel_url"] = tunnel_url
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # WhatsApp notification removed
-                    
-                    # Emit the tunnel URL to connected clients
-                    socketio.emit('tunnel_url', {'url': tunnel_url})
+                    # Look for the tunnel URL in the output
+                    match = re.search(r"https://[-\w]+\.trycloudflare\.com", line)
+                    if match and not tunnel_url:
+                        tunnel_url = match.group(0)
+                        STATS["last_tunnel_url"] = tunnel_url
+                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        
+                        # Emit the tunnel URL to connected clients
+                        socketio.emit('tunnel_url', {'url': tunnel_url})
         
         # Start the monitoring thread
         monitor_thread = threading.Thread(target=monitor_output)
@@ -332,55 +335,12 @@ def stop_tunnel():
         tunnel_process = None
         STATS["current_status"] = "Stopped"
 
-def ping_monitor_thread():
-    """Thread function to monitor ping and emit data to clients"""
-    global ping_data
-    
-    # Use the max_history_points from ping_data for 1 minute of data
-    max_history_size = ping_data["max_history_points"]
-    
-    while not stop_event.is_set():
-        # Get the current ping time using the configured ping_test_url
-        config = load_config()
-        ping_url = config.get("ping_test_url", "1.1.1.1")
-        ping_time = ping_host(ping_url)
-        
-        # Update ping data
-        ping_data["last_ping_time"] = ping_time
-        
-        # Add to history and maintain max size
-        current_time = time.time()  # Unix timestamp
-        ping_data["ping_history"].append({"timestamp": current_time, "ping_time": ping_time})
-        if len(ping_data["ping_history"]) > max_history_size:
-            ping_data["ping_history"].pop(0)
-        
-        # Calculate statistics
-        stats = calculate_ping_stats(ping_data["ping_history"])
-        
-        # Emit the ping data to all connected clients
-        socketio.emit('ping_data', {
-            'last_ping_time': ping_time,
-            'ping_history': ping_data["ping_history"],
-            'stats': stats
-        })
-        
-        # Wait for 1 second before the next ping
-        for _ in range(10):  # Check stop_event every 0.1 seconds
-            if stop_event.is_set():
-                break
-            time.sleep(0.1)
-
 def monitor_thread_func(config):
     """Main monitoring thread function"""
     global tunnel_process
     
     STATS["start_time"] = datetime.now()
     retry_count = 0
-    
-    # Start the ping monitor thread
-    ping_thread = threading.Thread(target=ping_monitor_thread)
-    ping_thread.daemon = True
-    ping_thread.start()
     
     while not stop_event.is_set():
         # Check internet connection
@@ -440,7 +400,7 @@ def cleanup():
 def index():
     """Render the main dashboard page"""
     config = load_config()
-    return render_template('index.html', config=config, stats=STATS)
+    return render_template('index.html', config=config, stats=STATS, current_year=dt.now().year)
 
 @app.route('/ping_test')
 def ping_test():
@@ -493,11 +453,7 @@ def ping_test():
 def settings():
     """Settings page"""
     config = load_config()
-    return render_template('settings.html', config=config)
-
-# Update ping URL route removed - using 1.1.1.1 as permanent default
-
-# Logs page route removed
+    return render_template('settings.html', config=config, current_year=dt.now().year)
 
 @app.route('/api/start', methods=['POST'])
 def api_start():
@@ -532,8 +488,6 @@ def api_stop():
     
     log("Monitor stopped", level="warning")
     return jsonify({"status": "success", "message": "Tunnel monitor stopped"})
-
-# WhatsApp test endpoint removed
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
@@ -591,8 +545,6 @@ def api_logs():
     
     return jsonify(logs)
 
-# API settings routes moved to new implementation
-
 @app.route('/api/ping')
 def api_ping():
     """Get current ping data with statistics"""
@@ -638,6 +590,96 @@ def calculate_ping_stats(ping_history):
         "count": len(ping_times)
     }
 
+# Global ping monitor thread
+ping_monitor_running = False
+ping_monitor_thread_instance = None
+internet_monitor_running = False
+internet_monitor_thread_instance = None
+
+def start_independent_ping_monitor():
+    """Start ping monitoring independent of tunnel status"""
+    global ping_monitor_running, ping_monitor_thread_instance
+    
+    if not ping_monitor_running:
+        ping_monitor_running = True
+        ping_monitor_thread_instance = threading.Thread(target=independent_ping_monitor_thread)
+        ping_monitor_thread_instance.daemon = True
+        ping_monitor_thread_instance.start()
+        log("Independent ping monitor started", level="info")
+
+def start_independent_internet_monitor():
+    """Start internet monitoring independent of tunnel status"""
+    global internet_monitor_running, internet_monitor_thread_instance
+    
+    if not internet_monitor_running:
+        internet_monitor_running = True
+        internet_monitor_thread_instance = threading.Thread(target=independent_internet_monitor_thread)
+        internet_monitor_thread_instance.daemon = True
+        internet_monitor_thread_instance.start()
+        log("Independent internet monitor started", level="info")
+
+def independent_ping_monitor_thread():
+    """Independent ping monitoring thread that runs continuously"""
+    global ping_data, ping_monitor_running
+    
+    max_history_size = ping_data["max_history_points"]
+    
+    while ping_monitor_running:
+        try:
+            # Get the current ping time using the configured ping_test_url
+            config = load_config()
+            ping_url = config.get("ping_test_url", "1.1.1.1")
+            ping_time = ping_host(ping_url)
+            
+            # Update ping data
+            ping_data["last_ping_time"] = ping_time
+            
+            # Add to history and maintain max size
+            current_time = time.time()  # Unix timestamp
+            ping_data["ping_history"].append({"timestamp": current_time, "ping_time": ping_time})
+            if len(ping_data["ping_history"]) > max_history_size:
+                ping_data["ping_history"].pop(0)
+            
+            # Calculate statistics
+            stats = calculate_ping_stats(ping_data["ping_history"])
+            
+            # Emit the ping data to all connected clients
+            socketio.emit('ping_data', {
+                'last_ping_time': ping_time,
+                'ping_history': ping_data["ping_history"],
+                'stats': stats
+            })
+            
+            # Wait for 1 second before the next ping
+            for _ in range(10):  # Check ping_monitor_running every 0.1 seconds
+                if not ping_monitor_running:
+                    break
+                time.sleep(0.1)
+        except Exception as e:
+            logger.error(f"Error in ping monitor thread: {e}")
+            time.sleep(1)
+
+def independent_internet_monitor_thread():
+    """Independent internet monitoring thread that runs continuously"""
+    global internet_monitor_running
+    
+    while internet_monitor_running:
+        try:
+            # Check internet connection
+            is_connected = internet_available()
+            
+            # Emit the internet status to all connected clients
+            socketio.emit('internet_status', {'status': is_connected})
+            
+            # Wait for 5 seconds before the next check
+            for _ in range(50):  # Check internet_monitor_running every 0.1 seconds
+                if not internet_monitor_running:
+                    break
+                time.sleep(0.1)
+        except Exception as e:
+            logger.error(f"Error in internet monitor thread: {e}")
+            time.sleep(5)
+
 # Socket.IO events
 @socketio.on('connect')
 def handle_connect():
@@ -662,14 +704,16 @@ def handle_connect():
             'stats': stats
         })
 
-# Remove any references to the logs route that was deleted
-
 # Main function
 def main():
     """Main function"""
     try:
         # Load configuration
         config = load_config()
+        
+        # Start independent monitoring threads
+        start_independent_ping_monitor()
+        start_independent_internet_monitor()
         
         # Get available port
         port = 5000
@@ -700,8 +744,15 @@ def main():
             url = f"http://localhost:{port}"
             threading.Timer(1.5, lambda: webbrowser.open(url)).start()
             log(f"Opening browser to {url}")
+            log(f"Access from other devices: http://{socket.gethostbyname(socket.gethostname())}:{port}")
         
         socketio.run(app, host=host, port=port, debug=config["debug_mode"])
+    except KeyboardInterrupt:
+        log("Shutting down...", level="warning")
+        # Stop independent monitors
+        global ping_monitor_running, internet_monitor_running
+        ping_monitor_running = False
+        internet_monitor_running = False
     except Exception as e:
         log(f"Error: {e}", level="error")
     finally:

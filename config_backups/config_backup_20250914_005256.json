@@ -1,5 +1,5 @@
 {
-    "tunnel_url": "http://192.168.100.1",
+    "tunnel_url": "http://192.168.100.1:8096/",
     "cloudflared_path": null,
     "check_interval": 60,
     "max_retries": 3,
