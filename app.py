@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-
 """
-Cloudflare Tunnel Monitor Web UI
+Cloudflare Tunnel Monitor - All-in-One Application
+A comprehensive solution for automatically creating and monitoring Cloudflare Tunnels
+with embedded web interface, real-time monitoring, and ping analytics.
 
-A web-based user interface for the Cloudflare Tunnel Monitor.
-This application allows users to configure settings, start/stop the tunnel, and view statistics.
+Author: Tariqul Islam
+Repository: https://github.com/MeTariqul/Cloudflare-Tunnel-Monitor.git
+Version: 2.0.0 (Consolidated)
 """
 
 import subprocess
@@ -24,9 +26,120 @@ import socket
 from pathlib import Path
 
 # Flask imports
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
+from flask import Flask, render_template_string, request, jsonify, redirect, url_for, flash, session
 from flask_socketio import SocketIO, emit
 from datetime import datetime as dt
+
+# Embedded HTML Templates (to reduce file count)
+BASE_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Cloudflare Tunnel Monitor{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #2ecc71; --error: #e74c3c; --bg: #f5f5f5; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        .panel { background: white; padding: 25px; border-radius: 12px; margin-bottom: 20px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; margin-right: 10px; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-danger { background: var(--error); color: white; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .status-indicator.running { background: var(--success); }
+        .status-indicator.stopped { background: var(--error); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-cloud"></i> Cloudflare Tunnel Monitor</h1>
+            <nav>
+                <a href="/" style="margin-right: 15px;">Dashboard</a>
+                <a href="/settings">Settings</a>
+            </nav>
+        </header>
+        <main>{% block content %}{% endblock %}</main>
+    </div>
+    <script>window.socket = io(); {% block scripts %}{% endblock %}</script>
+</body>
+</html>
+'''
+
+DASHBOARD_TEMPLATE = BASE_TEMPLATE.replace('{% block content %}{% endblock %}', 
+'''<div class="dashboard">
+    <div class="panel">
+        <h2>Tunnel Control</h2>
+        <button id="start-btn" class="btn btn-primary" onclick="startTunnel()">Start Tunnel</button>
+        <button id="stop-btn" class="btn btn-danger" onclick="stopTunnel()" disabled>Stop Tunnel</button>
+        <div style="margin-top: 15px;">
+            <div><span class="status-indicator" id="tunnel-status"></span>Tunnel: <span id="tunnel-text">Stopped</span></div>
+            <div><span class="status-indicator" id="internet-status"></span>Internet: <span id="internet-text">Checking...</span></div>
+        </div>
+    </div>
+    <div class="panel">
+        <h2>Tunnel URL</h2>
+        <input type="text" id="tunnel-url" value="Not available" readonly style="width: 100%; padding: 10px;">
+        <button class="btn btn-primary" onclick="copyUrl()" style="margin-top: 10px;">Copy URL</button>
+    </div>
+</div>''').replace('{% block scripts %}{% endblock %}', 
+'''async function startTunnel() {
+    const response = await fetch('/api/start', {method: 'POST'});
+    const data = await response.json();
+    if (data.status === 'success') updateStatus('Running');
+}
+async function stopTunnel() {
+    const response = await fetch('/api/stop', {method: 'POST'});
+    const data = await response.json();
+    if (data.status === 'success') updateStatus('Stopped');
+}
+function updateStatus(status) {
+    document.getElementById('tunnel-text').textContent = status;
+    const indicator = document.getElementById('tunnel-status');
+    indicator.className = status === 'Running' ? 'status-indicator running' : 'status-indicator stopped';
+    document.getElementById('start-btn').disabled = status === 'Running';
+    document.getElementById('stop-btn').disabled = status !== 'Running';
+}
+function copyUrl() {
+    const url = document.getElementById('tunnel-url').value;
+    if (url !== 'Not available') navigator.clipboard.writeText(url);
+}
+socket.on('tunnel_url', (data) => document.getElementById('tunnel-url').value = data.url);''')
+
+SETTINGS_TEMPLATE = BASE_TEMPLATE.replace('{% block content %}{% endblock %}', 
+'''<div class="panel">
+    <h2>Settings</h2>
+    <form onsubmit="saveSettings(event)">
+        <div style="margin-bottom: 15px;">
+            <label>Tunnel URL:</label>
+            <input type="url" name="tunnel_url" value="{{ config.tunnel_url }}" style="width: 100%; padding: 8px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label>Check Interval (seconds):</label>
+            <input type="number" name="check_interval" value="{{ config.check_interval }}" style="width: 100%; padding: 8px;">
+        </div>
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </form>
+</div>''').replace('{% block scripts %}{% endblock %}', 
+'''async function saveSettings(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const settings = Object.fromEntries(formData);
+    const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(settings)
+    });
+    const result = await response.json();
+    alert(result.status === 'success' ? 'Settings saved!' : 'Error: ' + result.message);
+}''')
 
 # Create logs directory if it doesn't exist
 logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -400,7 +513,7 @@ def cleanup():
 def index():
     """Render the main dashboard page"""
     config = load_config()
-    return render_template('index.html', config=config, stats=STATS, current_year=dt.now().year)
+    return render_template_string(DASHBOARD_TEMPLATE, config=config, stats=STATS, current_year=dt.now().year)
 
 @app.route('/ping_test')
 def ping_test():
@@ -453,7 +566,7 @@ def ping_test():
 def settings():
     """Settings page"""
     config = load_config()
-    return render_template('settings.html', config=config, current_year=dt.now().year)
+    return render_template_string(SETTINGS_TEMPLATE, config=config, current_year=dt.now().year)
 
 @app.route('/api/start', methods=['POST'])
 def api_start():
