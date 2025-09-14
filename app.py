@@ -2038,12 +2038,10 @@ def ping_host(host="1.1.1.1", timeout=1000):
     Returns:
         float or None: Response time in milliseconds if successful, None if failed
     """
-    # Determine the appropriate ping command based on the OS
-    param = "-n" if platform.system().lower() == "windows" else "-c"
-    timeout_param = "-w" if platform.system().lower() == "windows" else "-W"
-    
-    # On Linux/Mac, timeout is in seconds, on Windows it's in milliseconds
-    timeout_value = str(timeout) if platform.system().lower() == "windows" else str(timeout / 1000)
+    # Windows ping command parameters
+    param = "-n"
+    timeout_param = "-w"
+    timeout_value = str(timeout)
     
     try:
         # Hide the console output
@@ -2055,13 +2053,9 @@ def ping_host(host="1.1.1.1", timeout=1000):
                 universal_newlines=True
             )
             
-            # Parse the output to extract the time
-            if platform.system().lower() == "windows":
-                # Windows format: "Reply from 1.1.1.1: bytes=32 time=15ms TTL=57"
-                match = re.search(r"time=([0-9]+)ms", output)
-            else:
-                # Linux/Mac format: "64 bytes from 1.1.1.1: icmp_seq=1 ttl=57 time=14.5 ms"
-                match = re.search(r"time=([0-9.]+) ms", output)
+            # Parse the output to extract the time (Windows format)
+            # Windows format: "Reply from 1.1.1.1: bytes=32 time=15ms TTL=57"
+            match = re.search(r"time=([0-9]+)ms", output)
                 
             if match:
                 return float(match.group(1))
@@ -2163,14 +2157,11 @@ def run_tunnel(config):
     """Run cloudflared tunnel and return the process"""
     global tunnel_process
     
-    # Determine the cloudflared executable
+    # Determine the cloudflared executable (Windows)
     cloudflared_cmd = config["cloudflared_path"]
     if not cloudflared_cmd or not os.path.exists(cloudflared_cmd):
         # Try using the system-installed cloudflared
-        if os.name == 'nt':  # Windows
-            cloudflared_cmd = "cloudflared.exe"
-        else:  # Linux/Mac
-            cloudflared_cmd = "cloudflared"
+        cloudflared_cmd = "cloudflared.exe"
     
     log(f"Starting cloudflared tunnel to {config['tunnel_url']}")
     
@@ -2227,20 +2218,15 @@ def stop_tunnel():
     if tunnel_process:
         log("Stopping cloudflared tunnel...")
         try:
-            if os.name == 'nt':  # Windows
-                tunnel_process.terminate()
-            else:  # Linux/Mac
-                os.kill(tunnel_process.pid, signal.SIGTERM)
+            # Windows process termination
+            tunnel_process.terminate()
             tunnel_process.wait(timeout=5)
             log("Cloudflared tunnel stopped", level="success")
         except Exception as e:
             log(f"Error stopping cloudflared: {e}", level="error")
             # Force kill if normal termination fails
             try:
-                if os.name == 'nt':  # Windows
-                    os.system(f"taskkill /F /PID {tunnel_process.pid}")
-                else:  # Linux/Mac
-                    os.kill(tunnel_process.pid, signal.SIGKILL)
+                os.system(f"taskkill /F /PID {tunnel_process.pid}")
                 log("Cloudflared tunnel force-stopped", level="warning")
             except:
                 pass
@@ -2559,13 +2545,8 @@ def api_open_save_directory():
             os.makedirs(save_directory, exist_ok=True)
             log(f"Created directory: {save_directory}", level="info")
         
-        # Open directory in file explorer
-        if platform.system() == "Windows":
-            os.startfile(save_directory)
-        elif platform.system() == "Darwin":  # macOS
-            subprocess.run(["open", save_directory])
-        else:  # Linux and others
-            subprocess.run(["xdg-open", save_directory])
+        # Open directory in file explorer (Windows only)
+        os.startfile(save_directory)
         
         log(f"Opened directory: {save_directory}", level="info")
         return jsonify({
@@ -2739,14 +2720,10 @@ def api_restart():
             # Give time for response to be sent
             time.sleep(2)
             try:
-                # For Windows
-                if sys.platform.startswith('win'):
-                    os.system('taskkill /F /IM python.exe')
-                    time.sleep(1)
-                    os.system(f'start cmd /c "cd /d {os.getcwd()} && python app.py"')
-                else:
-                    # For Unix-like systems
-                    os.execv(sys.executable, ['python'] + sys.argv)
+                # Windows application restart
+                os.system('taskkill /F /IM python.exe')
+                time.sleep(1)
+                os.system(f'start cmd /c "cd /d {os.getcwd()} && python app.py"')
             except Exception as e:
                 logger.error(f"Restart failed: {e}")
         
@@ -3017,7 +2994,7 @@ def independent_ping_monitor_thread():
                 ping_data["last_ping_time"] = ping_time
                 
                 # Add to history and maintain max size
-                current_time = time.time()  # Unix timestamp
+                current_time = time.time()  # Timestamp
                 ping_data["ping_history"].append({"timestamp": current_time, "ping_time": ping_time})
                 if len(ping_data["ping_history"]) > max_history_size:
                     ping_data["ping_history"].pop(0)

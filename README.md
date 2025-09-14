@@ -31,7 +31,7 @@ A comprehensive, production-ready solution for automatically creating, monitorin
 - **🔧 Smart Auto-Setup**: Intelligent Python/venv detection and dependency management
 - **🛡️ Robust Monitoring**: Multi-threaded monitoring with automatic recovery
 - **💾 Configuration Backup**: Automatic config backups with version management
-- **🌐 Cross-Platform**: Full Windows, Linux, and macOS support
+- **🌐 Windows Only**: Optimized specifically for Windows 10/11
 - **⚡ High Performance**: Optimized for minimal resource usage
 
 ## 🚀 **Quick Start**
@@ -48,9 +48,6 @@ A comprehensive, production-ready solution for automatically creating, monitorin
    ```bash
    # Windows
    launcher.bat
-   
-   # Linux/macOS
-   chmod +x launcher.sh && ./launcher.sh
    ```
 
 3. **Access Dashboard**
@@ -68,12 +65,6 @@ A comprehensive, production-ready solution for automatically creating, monitorin
    ```bash
    # Windows (using winget)
    winget install cloudflare.cloudflared
-   
-   # macOS (using Homebrew)
-   brew install cloudflared
-   
-   # Linux (using package manager)
-   # See: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
    ```
 
 3. **Run Application**
@@ -85,7 +76,7 @@ A comprehensive, production-ready solution for automatically creating, monitorin
 
 ### **System Requirements**
 - **Python**: 3.7 or higher
-- **OS**: Windows 10/11, macOS 10.14+, or Linux (Ubuntu 18.04+)
+- **OS**: Windows 10/11 only
 - **RAM**: 512MB minimum (1GB recommended)
 - **Storage**: 100MB for application + space for logs and backups
 
@@ -204,8 +195,6 @@ cd Cloudflare-Tunnel-Monitor
 
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# or
 venv\Scripts\activate     # Windows
 
 # Install dependencies
@@ -221,8 +210,6 @@ python app.py
 pip install -r requirements.txt
 
 # Run with production settings
-export FLASK_ENV=production  # Linux/macOS
-# or
 set FLASK_ENV=production     # Windows
 python app.py
 ```
@@ -265,7 +252,7 @@ python app.py  # Look for error messages
 - Verify no firewall blocking local connections
 
 **Permission errors:**
-- Run as administrator (Windows) or with sudo (Linux/macOS)
+- Run as administrator (Windows)
 - Check file/directory permissions
 - Verify write access to application directory
 
